@@ -1,3 +1,6 @@
 .vs
 .DS_Store
 ContentTvReceiver/obj
+ContentTvReceiver/bin
+TelegramBotReceiver/bin
+TelegramBotReceiver/obj
