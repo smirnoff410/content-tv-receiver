@@ -2,17 +2,23 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="ContentTvReceiver.MainPage">
-        <StackLayout
-            Spacing="25"
-            Padding="30,0"
-            VerticalOptions="Center">
+    <Grid
+        BackgroundColor="Blue">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"></RowDefinition>
+        </Grid.RowDefinitions>
 
-            <Image
-                x:Name="ImageContent"
-                Source="dotnet_bot.png"
-                HeightRequest="400"
-               />
-        </StackLayout>
+        <Image
+            x:Name="ImageContent"
+            Source="dotnet_bot.png"
+            IsVisible="false"
+            Grid.Row="0"
+            />
+        <WebView 
+            x:Name="VideoContent"
+            Grid.Row="0"
+            HeightRequest="400"></WebView>
+    </Grid>
 
 </ContentPage>
 

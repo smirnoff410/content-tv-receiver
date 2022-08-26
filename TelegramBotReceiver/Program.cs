@@ -33,9 +33,9 @@ async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, Cancel
         }
         else if (message.Type == MessageType.Document)
         {
-            if (message.Document.MimeType == "video/mp4")
+            if (message.Animation is { } animation)
             {
-                await botClient.SendTextMessageAsync(message.Chat, "К сожалению я пока что не могу отображать анимированные изображения :(");
+                await SaveVideo(botClient, animation.FileId, animation.MimeType, animation.Height, animation.Width);
                 return;
             }
             await SaveImage(botClient, message.Document.FileId);
@@ -55,7 +55,19 @@ async Task SaveImage(ITelegramBotClient botClient, string fileId)
         await botClient.DownloadFileAsync(file.FilePath, fileStream);
         encryptedContent = fileStream.ToArray();
     }
-    File.WriteAllBytes("image.mp4", encryptedContent);
+    File.WriteAllBytes("image.jpg", encryptedContent);
+}
+
+async Task SaveVideo(ITelegramBotClient botClient, string fileId, string mimeType, int height, int weight)
+{
+	var file = await botClient.GetFileAsync(fileId);
+
+	using (var fileStream = new MemoryStream())
+	{
+		await botClient.DownloadFileAsync(file.FilePath, fileStream);
+		var encryptedContent = fileStream.ToArray();
+		File.WriteAllBytes("image.mp4", encryptedContent);
+	}
 }
 
 async Task HandleErrorAsync(ITelegramBotClient botClient, Exception exception, CancellationToken cancellationToken)
