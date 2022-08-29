@@ -1,4 +1,5 @@
-﻿using Android.Hardware.Lights;
+﻿using ContentTvReceiver.Config;
+using Microsoft.Extensions.Configuration;
 using Newtonsoft.Json;
 using Telegram.Bot;
 using Telegram.Bot.Extensions.Polling;
@@ -9,11 +10,14 @@ namespace ContentTvReceiver;
 
 public partial class MainPage : ContentPage
 {
-    public MainPage()
+	private HtmlWebViewSource htmlSource = new HtmlWebViewSource();
+	public MainPage(IConfiguration configuration)
 	{
 		InitializeComponent();
+		VideoContent.Source = htmlSource;
 
-		var bot = new TelegramBotClient("5539542686:AAFdCUf9ze542bqugblAe3pgK6XoZtB4yaU");
+		var settings = configuration.GetRequiredSection("TelegramSettings").Get<TelegramSettings>();
+		var bot = new TelegramBotClient(settings.BotToken);
 
 		var cts = new CancellationTokenSource();
 		var cancellationToken = cts.Token;
@@ -31,9 +35,18 @@ public partial class MainPage : ContentPage
 		if (update.Type == UpdateType.Message)
 		{
 			var message = update.Message;
+			if (message.Type == MessageType.Text)
+			{
+				var lowerText = message.Text.ToLower();
+				if (lowerText == "/start")
+				{
+					await botClient.SendTextMessageAsync(message.Chat, "Дарова бродяга, сюда ты можешь закинуть гифку, картинку, стикер или записать голосовое сообщение и оно отобразится у меня на телевизоре в прямом эфире");
+				}
+			}
 			if (message.Type == MessageType.Photo)
 			{
 				await SaveImage(botClient, message.Photo.Last().FileId);
+				await botClient.SendTextMessageAsync(message.Chat, "Изображение успешно принято и скоро отобразится :)");
 			}
 			else if (message.Type == MessageType.Document)
 			{
@@ -44,13 +57,30 @@ public partial class MainPage : ContentPage
 					return;
 				}
 				await SaveImage(botClient, message.Document.FileId);
+				await botClient.SendTextMessageAsync(message.Chat, "Изображение успешно принято и скоро отобразится :)");
+			}
+			else if (message.Type == MessageType.Sticker)
+			{
+				if (message.Sticker.IsVideo)
+					await SaveVideo(botClient, message.Sticker.FileId, null, message.Sticker.Height, message.Sticker.Width);
+				else if (message.Sticker.IsAnimated)
+					await botClient.SendTextMessageAsync(message.Chat, "К сожалению я пока что не умею отображать этот вид стикеров, попробуйте другой :(");
+				else
+					await SaveImage(botClient, message.Sticker.FileId);
+
+				await botClient.SendTextMessageAsync(message.Chat, "Стикер успешно принят и скоро отобразится :)");
+			}
+			else if (message.Type == MessageType.Voice)
+			{
+				await SaveAudio(botClient, message.Voice.FileId, message.Voice.MimeType);
+				await botClient.SendTextMessageAsync(message.Chat, "Голосовое успешно принято и скоро воспроизведется :)");
 			}
 			else
 			{
 				await botClient.SendTextMessageAsync(message.Chat, "Вы отправили неизвестный мне формат, я не знаю как это отобразить :(");
 				return;
 			}
-			await botClient.SendTextMessageAsync(message.Chat, "Изображение успешно принято и скоро отобразится :)");
+			MainThread.BeginInvokeOnMainThread(() => UserName.Text = message.From.Username);
 		}
 	}
 
@@ -70,14 +100,28 @@ public partial class MainPage : ContentPage
 		var encryptedContent = await GetBytesFromFile(botClient, fileId);
 		MainThread.BeginInvokeOnMainThread(() =>
 		{
-			var htmlSource = new HtmlWebViewSource();
-			htmlSource.Html = @$"<html><body><video autoplay muted loop playsinline class='slideContent' style='width:100%'><source src='data:{mimeType ?? "video/mp4"};base64,{Convert.ToBase64String(encryptedContent)}' type='video/mp4'></video></body></html>";
-			VideoContent.Source = htmlSource;
+			var type = mimeType ?? "video/mp4";
+			var base64String = Convert.ToBase64String(encryptedContent);
+			htmlSource.Html = @$"<html><body><video autoplay muted loop playsinline class='slideContent' style='width:100%'><source src='data:{type};base64,{base64String}' type='{type}'></video></body></html>";
 			ImageContent.IsVisible = false;
 			VideoContent.IsVisible = true;
 			VideoContent.HeightRequest = height;
 			VideoContent.WidthRequest = width;
 		});
+	}
+
+	async Task SaveAudio(ITelegramBotClient botClient, string fileId, string mimeType)
+	{
+		var encryptedContent = await GetBytesFromFile(botClient, fileId);
+		MainThread.BeginInvokeOnMainThread(() =>
+		{
+			var base64String = Convert.ToBase64String(encryptedContent);
+			htmlSource.Html = @$"<html><body><audio id='audioClass' controls src='data:{mimeType};base64,{base64String}'></audio></body></html>";
+			ImageContent.IsVisible = false;
+			VideoContent.IsVisible = true;
+			
+		});
+		await TextToSpeech.Default.SpeakAsync("Check voice message");
 	}
 
 	async Task<byte[]> GetBytesFromFile(ITelegramBotClient botClient, string fileId)
