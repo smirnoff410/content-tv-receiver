@@ -64,7 +64,11 @@ public partial class MainPage : ContentPage
 				if (message.Sticker.IsVideo)
 					await SaveVideo(botClient, message.Sticker.FileId, null, message.Sticker.Height, message.Sticker.Width);
 				else if (message.Sticker.IsAnimated)
+				{
 					await botClient.SendTextMessageAsync(message.Chat, "К сожалению я пока что не умею отображать этот вид стикеров, попробуйте другой :(");
+					return;
+				}
+					
 				else
 					await SaveImage(botClient, message.Sticker.FileId);
 
